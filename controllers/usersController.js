@@ -1,8 +1,11 @@
 require("dotenv").config();
 
+// Import required dependencies
 const usersService = require("../models/usersModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+
+// JWT Secret
 const secret = process.env.JWT_SECRET || "secret";
 
 // SQLITE ERROR NUMBERS
@@ -40,7 +43,7 @@ module.exports = {
   // FIND ALL USERS
   find: async (req, res) => {
     try {
-      const users = await usersService.find({ ...req.query });
+      const users = await usersService.find();
       users.forEach((user) => delete user.password);
       res.json(users);
     } catch (err) {
@@ -50,29 +53,20 @@ module.exports = {
   },
 
   // FIND USER BY ID
-  findById: async (req, res) => {
-    try {
-      const user = await usersService.findById(req.params.id);
-      delete user.password;
-      res.json(user);
-    } catch (err) {
-      err.msg = "failed to find user";
-      res.status(500).json({ msg: err.msg, errno: err.errno, code: err.code });
-    }
+  findById: (req, res) => {
+    let user = req.user;
+    delete user.password;
+    res.json(user);
   },
 
   // UPDATE USER INFO
   update: async (req, res) => {
-    let { id } = req.params;
+    let user = req.user;
     const changes = req.body;
     try {
-      const foundUser = await usersService.findById(id);
-      if (!foundUser)
-        res.status(400).json({ message: "user not found with given id" });
-      else {
-        const updatedUser = await usersService.update(changes, id);
-        res.json(updatedUser);
-      }
+      const updatedUser = await usersService.update(changes, user.id);
+      delete updatedUser.password;
+      res.json(updatedUser);
     } catch (err) {
       err.msg = "failed to update user";
       res.status(500).json({ msg: err.msg, errno: err.errno, code: err.code });
@@ -81,15 +75,11 @@ module.exports = {
 
   // DELETE USER
   delete: async (req, res) => {
-    let { id } = req.params;
+    let user = req.user;
     try {
-      const foundUser = await usersService.findById(id);
-      if (!foundUser)
-        res.status(400).json({ message: "user not found with given id" });
-      else {
-        const deletedUser = await usersService.delete(id);
-        res.json(deletedUser);
-      }
+      const deletedUser = await usersService.delete(user.id);
+      delete user.password;
+      res.json({ success: deletedUser, ...user });
     } catch (err) {
       err.msg = "failed to remove user";
       res.status(500).json({ msg: err.msg, errno: err.errno, code: err.code });
@@ -97,6 +87,7 @@ module.exports = {
   },
 };
 
+// Generate Token Function
 function genToken(user) {
   const payload = {
     subject: user.id,

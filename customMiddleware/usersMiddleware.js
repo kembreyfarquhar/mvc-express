@@ -1,7 +1,13 @@
 const usersService = require("../models/usersModel");
 const bcrypt = require("bcryptjs");
 
-module.exports = { validateUser, validateUserChanges, validateWithPassword };
+module.exports = {
+  validateUser,
+  validateUserChanges,
+  validateUserId,
+  validateWithPassword,
+  verifyUserByToken,
+};
 
 function validateUser(req, res, next) {
   if (!req.body.username)
@@ -25,6 +31,25 @@ function validateUserChanges(req, res, next) {
   else next();
 }
 
+async function validateUserId(req, res, next) {
+  const { id } = req.params;
+
+  try {
+    const user = await usersService.findById(id);
+
+    if (user) {
+      req.user = user;
+      next();
+    } else {
+      res.status(404).json({ message: "user with that id does not exist" });
+    }
+  } catch (err) {
+    res
+      .status(500)
+      .json({ error: err.toString(), message: "something went wrong" });
+  }
+}
+
 async function validateWithPassword(req, res, next) {
   const { username, password } = req.body;
 
@@ -45,5 +70,13 @@ async function validateWithPassword(req, res, next) {
     res
       .status(500)
       .json({ error: err.toString(), message: "something went wrong" });
+  }
+}
+
+async function verifyUserByToken(req, res, next) {
+  if (req.params.id && req.params.id == req.jwtToken.subject) {
+    next();
+  } else {
+    res.status(401).json({ error: "user id and user token do not match" });
   }
 }
